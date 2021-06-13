@@ -14,14 +14,25 @@ const getComments = (html) => {
   const $ = cheerio.load(html);
   const commtexts = $(".commtext").toArray();
 
-  const comments = commtexts.map((ct) => {
+  const contents = commtexts.map((ct) => {
     const textObjs = ct.children.filter((c) => c.type === "text");
     return textObjs.map((to) => to.data).join(" ");
   });
 
   // replace the escaped links " ( )"
-  const commentsCleaned = comments.map((c) => c.replace(/\s?\(\s\)/g, ""));
-  return commentsCleaned;
+  const contentsCleaned = contents.map((c) => c.replace(/\s?\(\s\)/g, ""));
+
+  const usernames = $(".comhead .hnuser")
+    .toArray()
+    .map((u) => u.children[0].data);
+
+  const comments = contentsCleaned.map((content) => ({ content }));
+
+  usernames.forEach((u, i) => (comments[i].username = u));
+
+  const commentsNoEmpty = comments.filter((c) => !!c.content);
+
+  return commentsNoEmpty;
 };
 
 const writeComments = (threadId, comments) => {
@@ -39,11 +50,25 @@ const writeComments = (threadId, comments) => {
   }
 };
 
+const mapToSymbl = (comments) => {
+  const messages = comments.map((c) => ({
+    payload: {
+      content: c.content,
+    },
+    from: {
+      userId: c.username,
+      name: c.username,
+    },
+  }));
+
+  return { messages, enableSummary: true, detectPhrases: true };
+};
+
 const run = async () => {
   const threadId = args[2];
 
   if (!threadId) {
-    console.log("Must provide a thread id");
+    console.error("Must provide a thread id");
     process.exit(2);
   }
 
@@ -56,7 +81,11 @@ const run = async () => {
   console.log(comments.slice(0, 3));
 
   console.log(`Writing comments to file...`);
-  writeComments(threadId, comments.slice(0, 3));
+
+  const symblReq = mapToSymbl(comments);
+
+  writeComments(threadId, symblReq);
+  console.log("done.");
 };
 
 run();
