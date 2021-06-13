@@ -1,6 +1,7 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 const fs = require("fs");
+var os = require("os");
 
 const args = process.argv;
 
@@ -17,14 +18,17 @@ const getComments = (html) => {
     const textObjs = ct.children.filter((c) => c.type === "text");
     return textObjs.map((to) => to.data).join(" ");
   });
-  return comments;
+
+  // replace the escaped links " ( )"
+  const commentsCleaned = comments.map((c) => c.replace(/\s?\(\s\)/g, ""));
+  return commentsCleaned;
 };
 
 const writeComments = (threadId, comments) => {
   try {
     const content = JSON.stringify(comments);
     fs.writeFileSync(
-      __dirname + `/comments-${threadId}-${new Date.getTime()}.txt`,
+      __dirname + `/comments-${threadId}-${new Date().getTime()}.txt`,
       content,
       {
         flag: "w+",
@@ -43,12 +47,16 @@ const run = async () => {
     process.exit(2);
   }
 
+  console.log(`Fetching thread ${threadId}...`);
   const html = await getThreadHtml(threadId);
-  console.log(html.slice(0, 100));
 
+  console.log(`Extracting comments...`);
   const comments = await getComments(html);
 
-  writeComments(threadId);
+  console.log(comments.slice(0, 3));
+
+  console.log(`Writing comments to file...`);
+  writeComments(threadId, comments.slice(0, 3));
 };
 
 run();
